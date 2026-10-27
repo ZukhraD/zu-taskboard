@@ -25,6 +25,7 @@
 html,body{margin:0;height:100%;background:var(--cream);color:var(--ink);
   font:15px/1.4 Manrope,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{font-size:16px}
 #app{display:flex;height:100%;max-width:1200px;margin:0 auto;gap:14px;padding:12px}
 
 /* --- боковая панель --- */
@@ -93,7 +94,7 @@ header h1{font-size:30px;line-height:1.1;margin:0;letter-spacing:-.025em;font-we
 .sub{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:14px}
 .sub .chk{width:18px;height:18px;font-size:11px;margin:0;border-width:2px}
 .sub-add{margin:6px 0 0 38px}
-.sub-add input{width:100%;padding:7px 12px;border-radius:12px;border:0;background:var(--beige);font-size:14px}
+.sub-add input{width:100%;padding:7px 12px;border-radius:12px;border:0;background:var(--beige);font-size:16px}
 .sub-add input::placeholder{color:var(--muted)}
 .icon-btn{border:0;background:none;color:var(--muted);cursor:pointer;font-size:18px;padding:0 4px}
 .empty{text-align:center;color:var(--muted);margin-top:40px;font-weight:500}
@@ -111,6 +112,9 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
 .f-row{display:flex;gap:10px}.f-row .f{flex:1;min-width:0}
 .actions{display:flex;justify-content:space-between;margin-top:8px}
 .scrim{display:none}
+.ac-note{font-size:12px;color:#8b877b;margin:2px 12px 6px;word-break:break-all}
+.ac-in{width:calc(100% - 8px);margin:2px 4px 6px;padding:9px 12px;border-radius:12px;border:1px solid #333;background:#222;color:#fff}
+.ac-in::placeholder{color:#8b877b}
 
 @media (max-width:760px){
   #app{padding:0;gap:0}
@@ -144,6 +148,8 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
       <button class="btn soft" id="importBtn">Импорт</button>
     </div>
     <input type="file" id="importFile" accept="application/json" hidden>
+    <div class="nav-title">Аккаунт</div>
+    <div id="acct"></div>
   </aside>
   <div class="scrim" id="scrim"></div>
   <main>
@@ -185,6 +191,7 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
   </form>
 </dialog>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
 const KEY='taskapp.v1';
@@ -198,10 +205,11 @@ let view={type:'today'}; // today | upcoming | inbox | all | done | project
 let editingId=null;
 
 function load(){
-  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.tasks)return s}catch(e){}
-  return {projects:[],tasks:[]};
+  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.tasks){s.deleted=s.deleted||{};return s}}catch(e){}
+  return {projects:[],tasks:[],deleted:{}};
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){alert('Не удалось сохранить данные')}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){alert('Не удалось сохранить данные')}scheduleSync()}
+const touch=o=>{o.u=Date.now();return o};
 
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmtDate(t){
@@ -337,23 +345,23 @@ function bindList(){
   L.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{view={type:b.dataset.go};render()});
   L.querySelectorAll('[data-chk]').forEach(b=>b.onclick=()=>{
     const t=state.tasks.find(x=>x.id===b.dataset.chk);
-    t.done=!t.done;t.doneAt=t.done?Date.now():null;
+    t.done=!t.done;t.doneAt=t.done?Date.now():null;touch(t);
     save();render();
   });
   L.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openDialog(b.dataset.edit));
   L.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{
     const t=state.tasks.find(x=>x.id===b.dataset.t);
-    const s=t.subs.find(x=>x.id===b.dataset.sub);s.done=!s.done;save();render();
+    const s=t.subs.find(x=>x.id===b.dataset.sub);s.done=!s.done;touch(t);save();render();
   });
   L.querySelectorAll('[data-subdel]').forEach(b=>b.onclick=()=>{
     const t=state.tasks.find(x=>x.id===b.dataset.t);
-    t.subs=t.subs.filter(x=>x.id!==b.dataset.subdel);save();render();
+    t.subs=t.subs.filter(x=>x.id!==b.dataset.subdel);touch(t);save();render();
   });
   L.querySelectorAll('[data-subadd]').forEach(inp=>inp.addEventListener('keydown',e=>{
     if(e.key!=='Enter')return;
     const v=inp.value.trim();if(!v)return;
     const t=state.tasks.find(x=>x.id===inp.dataset.subadd);
-    (t.subs=t.subs||[]).push({id:uid(),title:v,done:false});
+    (t.subs=t.subs||[]).push({id:uid(),title:v,done:false});touch(t);
     save();render();
     const again=L.querySelector(`[data-subadd="${t.id}"]`);if(again)again.focus();
   }));
@@ -382,6 +390,7 @@ $('fab').onclick=()=>openDialog();
 $('fCancel').onclick=()=>$('dlg').close();
 $('fDelete').onclick=()=>{
   if(!confirm('Удалить задачу?'))return;
+  state.deleted[editingId]=Date.now();
   state.tasks=state.tasks.filter(t=>t.id!==editingId);
   save();$('dlg').close();render();
 };
@@ -390,22 +399,23 @@ $('form').addEventListener('submit',()=>{
   if(!title)return;
   const data={title,note:$('fNote').value.trim(),date:$('fDate').value,time:$('fTime').value,
     prio:+$('fPrio').value,projectId:$('fProject').value||null};
-  if(editingId){Object.assign(state.tasks.find(t=>t.id===editingId),data)}
-  else state.tasks.push({id:uid(),done:false,subs:[],created:Date.now(),...data});
+  if(editingId){touch(Object.assign(state.tasks.find(t=>t.id===editingId),data))}
+  else state.tasks.push(touch({id:uid(),done:false,subs:[],created:Date.now(),...data}));
   save();render();
 });
 
 // --- проекты ---
 function addProject(){
   const v=$('newProject').value.trim();if(!v)return;
-  const p={id:uid(),name:v};state.projects.push(p);
+  const p=touch({id:uid(),name:v});state.projects.push(p);
   $('newProject').value='';save();view={type:'project',id:p.id};closeMenu();render();
 }
 $('addProject').onclick=addProject;
 $('newProject').addEventListener('keydown',e=>{if(e.key==='Enter')addProject()});
 $('delProject').onclick=()=>{
   if(!confirm('Удалить проект? Его задачи останутся во «Входящих».'))return;
-  state.tasks.forEach(t=>{if(t.projectId===view.id)t.projectId=null});
+  state.tasks.forEach(t=>{if(t.projectId===view.id){t.projectId=null;touch(t)}});
+  state.deleted[view.id]=Date.now();
   state.projects=state.projects.filter(p=>p.id!==view.id);
   save();view={type:'inbox'};render();
 };
@@ -414,6 +424,112 @@ $('delProject').onclick=()=>{
 function closeMenu(){$('side').classList.remove('open');$('scrim').classList.remove('show')}
 $('menuBtn').onclick=()=>{$('side').classList.add('open');$('scrim').classList.add('show')};
 $('scrim').onclick=closeMenu;
+
+// --- синхронизация (Supabase) ---
+const SB_URL='https://enxmmjdmkbfpmbyvgyei.supabase.co';
+const SB_KEY='sb_publishable_8ODpS1wNyP_aSewFC2VmIQ_DqXGOLv4';
+let sb=null,session=null,syncing=false,again=false,syncTimer=null,lastSync=null,syncErr='';
+let acStep='email',pendingEmail='',acText='';
+
+function mergeStates(a,b){
+  const del={...(a.deleted||{})};
+  for(const k in (b.deleted||{}))del[k]=Math.max(del[k]||0,b.deleted[k]);
+  const mergeList=(x,y)=>{
+    const m=new Map();
+    [...(x||[]),...(y||[])].forEach(it=>{
+      const c=m.get(it.id);
+      if(!c||(it.u||0)>(c.u||0))m.set(it.id,it);
+    });
+    return [...m.values()].filter(it=>!(del[it.id]&&del[it.id]>=(it.u||0)));
+  };
+  return {projects:mergeList(a.projects,b.projects),tasks:mergeList(a.tasks,b.tasks),deleted:del};
+}
+function initSb(){
+  if(sb)return true;
+  if(!window.supabase)return false;
+  sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+  return true;
+}
+async function syncNow(){
+  if(!initSb()||!session)return;
+  if(syncing){again=true;return}
+  syncing=true;syncErr='';renderAcct();
+  try{
+    const userId=session.user.id;
+    const {data,error}=await sb.from('app_state').select('data').eq('user_id',userId).maybeSingle();
+    if(error)throw error;
+    if(data&&data.data&&data.data.tasks)state=mergeStates(state,data.data);
+    try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    const {error:e2}=await sb.from('app_state').upsert({user_id:userId,data:state,updated_at:new Date().toISOString()});
+    if(e2)throw e2;
+    lastSync=new Date();
+    render();
+  }catch(e){syncErr=(e&&e.message)||'нет связи'}
+  syncing=false;renderAcct();
+  if(again){again=false;scheduleSync()}
+}
+function scheduleSync(){
+  if(!session)return;
+  clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,1200);
+}
+function acMsg(t){acText=t;renderAcct()}
+function renderAcct(){
+  const el=$('acct');
+  if(!initSb()){el.innerHTML='<div class="ac-note">Синхронизация недоступна без интернета</div>';return}
+  if(session){
+    const st=syncErr?'Ошибка: '+esc(syncErr):syncing?'Синхронизация…':lastSync?'Синхронизировано в '+lastSync.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):'';
+    el.innerHTML=`<div class="ac-note">${esc(session.user.email||'')}</div><div class="ac-note">${st}</div>
+      <div class="side-btns"><button class="btn soft" id="acSync">Обновить</button><button class="btn soft" id="acOut">Выйти</button></div>`;
+    $('acSync').onclick=syncNow;
+    $('acOut').onclick=async()=>{await sb.auth.signOut();session=null;lastSync=null;acStep='email';acText='';renderAcct()};
+    return;
+  }
+  if(acStep==='email'){
+    el.innerHTML=`<input class="ac-in" id="acEmail" type="email" inputmode="email" autocomplete="email" placeholder="Ваша почта">
+      <div class="side-btns"><button class="btn pink" id="acSend">Получить код</button></div>
+      <div class="ac-note">${esc(acText)}</div>`;
+    $('acSend').onclick=sendCode;
+    $('acEmail').addEventListener('keydown',e=>{if(e.key==='Enter')sendCode()});
+  }else{
+    el.innerHTML=`<div class="ac-note">Код отправлен на ${esc(pendingEmail)}</div>
+      <input class="ac-in" id="acCode" inputmode="numeric" autocomplete="one-time-code" placeholder="Код из письма">
+      <div class="side-btns"><button class="btn pink" id="acVerify">Войти</button><button class="btn soft" id="acBack">Назад</button></div>
+      <div class="ac-note">${esc(acText)}</div>`;
+    $('acVerify').onclick=verifyCode;
+    $('acBack').onclick=()=>{acStep='email';acText='';renderAcct()};
+    $('acCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyCode()});
+  }
+}
+async function sendCode(){
+  const email=$('acEmail').value.trim();
+  if(!email){acMsg('Введите почту');return}
+  $('acSend').disabled=true;
+  const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
+  if(error){acMsg(error.message);return}
+  pendingEmail=email;acStep='code';acText='';renderAcct();
+}
+async function verifyCode(){
+  const token=$('acCode').value.trim();
+  if(!token)return;
+  $('acVerify').disabled=true;
+  const {error}=await sb.auth.verifyOtp({email:pendingEmail,token,type:'email'});
+  if(error){acMsg('Неверный или просроченный код');return}
+  acStep='email';acText='';
+}
+async function initAuth(){
+  if(!initSb()){renderAcct();return}
+  const {data}=await sb.auth.getSession();
+  session=data.session;
+  sb.auth.onAuthStateChange((ev,s)=>{
+    const was=!!session;session=s;
+    if(s&&!was){renderAcct();syncNow()}else if(!s&&was){renderAcct()}
+  });
+  renderAcct();
+  if(session)syncNow();
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow()});
+  window.addEventListener('online',syncNow);
+  setInterval(()=>{if(!document.hidden)syncNow()},60000);
+}
 
 // --- экспорт / импорт ---
 $('exportBtn').onclick=()=>{
@@ -429,7 +545,7 @@ $('importFile').onchange=e=>{
     try{
       const s=JSON.parse(r.result);
       if(!s.tasks||!s.projects)throw 0;
-      if(confirm('Заменить текущие данные импортированными?')){state=s;save();render()}
+      if(confirm('Добавить данные из файла к текущим?')){state=mergeStates(state,Object.assign({deleted:{}},s));save();render()}
     }catch(_){alert('Файл не подходит')}
   };
   r.readAsText(f);e.target.value='';
@@ -439,6 +555,7 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
 render();
+initAuth();
 })();
 </script>
 </body>
