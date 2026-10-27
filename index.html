@@ -120,6 +120,34 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
 .scrim{display:none}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 10px}
 .chips button{border:0;background:var(--beige);border-radius:99px;padding:5px 12px;font-size:13px;font-weight:700;cursor:pointer}
+.chips button.on{background:var(--ink);color:#fff}
+.wide{grid-column:1/-1}
+.habit{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:13px 14px;margin-bottom:8px}
+.chk.big{width:30px;height:30px;font-size:16px}
+.week{display:flex;gap:6px;margin:10px 0 0 42px;flex-wrap:wrap}
+.wd{width:30px;height:30px;border-radius:50%;border:0;background:var(--beige);font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;padding:0}
+.wd.on{background:var(--green);color:#fff}
+.wd.rest{background:none;border:1px dashed #cfc8b5}
+.wd.td{box-shadow:0 0 0 2px var(--ink)}
+.s3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.s3 .stat{flex-direction:column;align-items:flex-start;gap:2px;cursor:default}
+.s3 .stat .s-n{font-size:28px}
+.s2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+.s2 .stat{flex-direction:column;align-items:flex-start;gap:2px;cursor:default}
+.s2 .stat .s-n{font-size:28px}
+.chart{display:flex;align-items:stretch;gap:4px;height:170px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:12px 10px 8px;margin-bottom:6px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0}
+.bw{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.bw i{display:block;width:100%;max-width:30px;background:var(--pink);border-radius:8px 8px 3px 3px}
+.bw i.tdy{background:var(--ink)}
+.bv{font-size:11px;font-weight:800;height:15px}
+.bl{font-size:10px;color:var(--muted);height:14px;white-space:nowrap}
+.hbar{display:grid;grid-template-columns:minmax(80px,1fr) 2fr auto;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px 14px;margin-bottom:6px}
+.hbar .track{height:10px;border-radius:99px;background:var(--beige);overflow:hidden}
+.hbar .fill{height:100%;border-radius:99px;background:var(--blue)}
+.hbar.y .fill{background:var(--yellow)}
+.hbar .nm{font-weight:600;word-break:break-word}
+.hbar .vl{font-size:13px;font-weight:800;color:var(--muted)}
 .cal-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .seg{display:flex;background:var(--beige);border-radius:99px;padding:3px}
 .seg button{border:0;background:none;padding:6px 14px;border-radius:99px;font-weight:700;cursor:pointer;color:var(--muted)}
@@ -228,6 +256,26 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
   </form>
 </dialog>
 
+<dialog id="hdlg">
+  <form method="dialog" id="hform">
+    <h2 id="hTitleH">Новая привычка</h2>
+    <div class="f"><label>Название</label><input id="hName" required autocomplete="off" placeholder="Например: зарядка"></div>
+    <div class="f"><label>Дни недели</label>
+      <div class="chips" id="hDays">
+        <button type="button" data-d="0">Пн</button><button type="button" data-d="1">Вт</button><button type="button" data-d="2">Ср</button>
+        <button type="button" data-d="3">Чт</button><button type="button" data-d="4">Пт</button><button type="button" data-d="5">Сб</button><button type="button" data-d="6">Вс</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn danger" id="hDelete">Удалить</button>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="btn ghost" id="hCancel">Отмена</button>
+        <button class="btn">Сохранить</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
@@ -243,8 +291,8 @@ let editingId=null;
 let calMode='week',calAnchor=todayStr(),calSel=todayStr();
 
 function load(){
-  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.tasks){s.deleted=s.deleted||{};return s}}catch(e){}
-  return {projects:[],tasks:[],deleted:{}};
+  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.tasks){s.deleted=s.deleted||{};s.habits=s.habits||[];return s}}catch(e){}
+  return {projects:[],tasks:[],deleted:{},habits:[]};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){alert('Не удалось сохранить данные')}scheduleSync()}
 const touch=o=>{o.u=Date.now();return o};
@@ -320,9 +368,10 @@ function render(){
     upcoming:open.filter(t=>t.date&&t.date>td).length,
     inbox:open.filter(t=>!t.projectId).length,
     all:open.length,
-    done:state.tasks.length-open.length
+    done:state.tasks.length-open.length,
+    habits:(state.habits||[]).filter(h=>sched(h,td)&&!checked(h,td)).length
   };
-  const smart=[['today','Сегодня'],['calendar','Календарь'],['upcoming','Предстоящие'],['inbox','Входящие'],['all','Все'],['done','Выполнено']];
+  const smart=[['today','Сегодня'],['calendar','Календарь'],['upcoming','Предстоящие'],['inbox','Входящие'],['all','Все'],['done','Выполнено'],['habits','Привычки'],['stats','Статистика']];
   $('smart').innerHTML=smart.map(([k,n])=>navBtn(k,n,counts[k],view.type===k)).join('');
   $('projects').innerHTML=state.projects.map(p=>{
     const c=open.filter(t=>t.projectId===p.id).length;
@@ -340,12 +389,21 @@ function render(){
   const ds=new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
   $('sub').textContent=ds.charAt(0).toUpperCase()+ds.slice(1);
   $('delProject').hidden=view.type!=='project';
+  $('fab').style.display=view.type==='stats'?'none':'';
   if(view.type==='calendar'){
     const m=new Date(calAnchor+'T00:00').toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
     $('sub').textContent=m.charAt(0).toUpperCase()+m.slice(1);
     $('list').innerHTML=calHtml();
     bindList();bindCal();
     return;
+  }
+  if(view.type==='habits'){
+    $('sub').textContent='Повторяющиеся действия';
+    $('list').innerHTML=habitsHtml();bindHabits();return;
+  }
+  if(view.type==='stats'){
+    $('sub').textContent=statPeriod===7?'Последние 7 дней':'Последние 30 дней';
+    $('list').innerHTML=statsHtml();bindStats();return;
   }
 
   const items=filtered();
@@ -491,6 +549,141 @@ function bindCal(){
   });
 }
 
+// --- привычки ---
+const DAYS_ALL=[0,1,2,3,4,5,6];
+const WD_LETTER=['П','В','С','Ч','П','С','В'];
+const sched=(h,d)=>(h.days||DAYS_ALL).includes((MONTH_DATE(d).getDay()+6)%7);
+const checked=(h,d)=>!!(h.log&&h.log[d]>0);
+function streak(h){
+  const td=todayStr();let c=0,d=td,g=0;
+  while(g++<800){
+    if(sched(h,d)){if(checked(h,d))c++;else if(d!==td)break}
+    d=addDays(d,-1);
+  }
+  return c;
+}
+function pctOf(h,days){
+  let s_=0,c_=0;
+  days.forEach(d=>{if(sched(h,d)){s_++;if(checked(h,d))c_++}});
+  return {s:s_,c:c_,p:s_?Math.round(c_*100/s_):0};
+}
+function lastDays(n){const td=todayStr(),a=[];for(let i=n-1;i>=0;i--)a.push(addDays(td,-i));return a}
+function toggleHabit(id,d){
+  const h=state.habits.find(x=>x.id===id);if(!h)return;
+  h.log=h.log||{};
+  h.log[d]=checked(h,d)?-Date.now():Date.now();
+  touch(h);save();render();
+}
+function habitsHtml(){
+  const td=todayStr(),hs=state.habits||[];
+  const today=hs.filter(h=>sched(h,td));
+  const doneN=today.filter(h=>checked(h,td)).length;
+  const best=hs.reduce((m,h)=>Math.max(m,streak(h)),0);
+  const sum=`<div class="s2 wide">
+    <div class="stat pink"><span class="s-l">Сегодня</span><span class="s-n">${doneN} из ${today.length}</span></div>
+    <div class="stat yellow"><span class="s-l">Лучшая серия</span><span class="s-n">${best} дн.</span></div></div>`;
+  if(!hs.length)return sum+'<div class="empty wide">Привычек пока нет.<br>Нажмите «+», чтобы добавить первую.</div>';
+  const week=lastDays(7);
+  const cards=hs.map(h=>{
+    const st=streak(h),p=pctOf(h,lastDays(30));
+    const cells=week.map(d=>{
+      const on=checked(h,d),rest=!sched(h,d);
+      return `<button class="wd${on?' on':''}${rest&&!on?' rest':''}${d===td?' td':''}" data-hday="${h.id}|${d}" aria-label="${d}">${on?'✓':WD_LETTER[(MONTH_DATE(d).getDay()+6)%7]}</button>`;
+    }).join('');
+    const on=checked(h,td);
+    return `<div class="habit">
+      <div class="t-row">
+        <button class="chk big${on?' done':''}" data-hchk="${h.id}" aria-label="Отметить сегодня">${on?'✓':''}</button>
+        <div class="t-body" data-hedit="${h.id}">
+          <div class="t-title">${esc(h.name)}</div>
+          <div class="meta"><span class="pill date">Серия: ${st} дн.</span><span class="pill">30 дней: ${p.p}%</span>${sched(h,td)?'':'<span class="pill">сегодня отдых</span>'}</div>
+        </div>
+      </div>
+      <div class="week">${cells}</div>
+    </div>`;
+  }).join('');
+  return sum+`<div class="wide">${cards}</div>`;
+}
+function bindHabits(){
+  const L=$('list');
+  L.querySelectorAll('[data-hchk]').forEach(b=>b.onclick=()=>toggleHabit(b.dataset.hchk,todayStr()));
+  L.querySelectorAll('[data-hday]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.hday.split('|');toggleHabit(id,d)});
+  L.querySelectorAll('[data-hedit]').forEach(b=>b.onclick=()=>openHabit(b.dataset.hedit));
+}
+let editingHabit=null,hDays=DAYS_ALL.slice();
+function paintDays(){document.querySelectorAll('#hDays [data-d]').forEach(b=>b.classList.toggle('on',hDays.includes(+b.dataset.d)))}
+function openHabit(id){
+  editingHabit=id||null;
+  const h=id?state.habits.find(x=>x.id===id):null;
+  $('hTitleH').textContent=h?'Привычка':'Новая привычка';
+  $('hName').value=h?h.name:'';
+  hDays=h?(h.days||DAYS_ALL).slice():DAYS_ALL.slice();
+  paintDays();
+  $('hDelete').style.display=h?'':'none';
+  $('hdlg').showModal();
+  if(!h)setTimeout(()=>$('hName').focus(),50);
+}
+document.querySelectorAll('#hDays [data-d]').forEach(b=>b.onclick=()=>{
+  const d=+b.dataset.d;hDays=hDays.includes(d)?hDays.filter(x=>x!==d):hDays.concat(d);paintDays();
+});
+$('hCancel').onclick=()=>$('hdlg').close();
+$('hDelete').onclick=()=>{
+  if(!confirm('Удалить привычку вместе с историей?'))return;
+  state.deleted[editingHabit]=Date.now();
+  state.habits=state.habits.filter(h=>h.id!==editingHabit);
+  save();$('hdlg').close();render();
+};
+$('hform').addEventListener('submit',()=>{
+  const name=$('hName').value.trim();if(!name)return;
+  const days=hDays.length?hDays.slice().sort():DAYS_ALL.slice();
+  if(editingHabit){touch(Object.assign(state.habits.find(h=>h.id===editingHabit),{name,days}))}
+  else state.habits.push(touch({id:uid(),name,days,log:{}}));
+  save();render();
+});
+
+// --- статистика ---
+let statPeriod=7;
+const completionsOf=t=>(t.done&&t.doneAt?[dstr(new Date(t.doneAt))]:[]).concat(t.hist||[]);
+function statsHtml(){
+  const td=todayStr(),days=lastDays(statPeriod);
+  const by={};
+  state.tasks.forEach(t=>completionsOf(t).forEach(d=>{by[d]=(by[d]||0)+1}));
+  const counts=days.map(d=>by[d]||0);
+  const total=counts.reduce((a,b)=>a+b,0);
+  const max=Math.max(1,...counts);
+  const hrows=(state.habits||[]).map(h=>({h,...pctOf(h,days)}));
+  const hs=hrows.reduce((a,r)=>a+r.s,0),hc=hrows.reduce((a,r)=>a+r.c,0);
+  const hp=hs?Math.round(hc*100/hs):0;
+  const overdue=state.tasks.filter(t=>!t.done&&t.date&&t.date<td).length;
+  const bars=days.map((d,i)=>{
+    const n=counts[i];
+    const lab=statPeriod===7?MONTH_DATE(d).toLocaleDateString('ru-RU',{weekday:'short'}):((i%5===0||i===days.length-1)?MONTH_DATE(d).getDate():'');
+    return `<div class="bar"><span class="bv">${statPeriod===7&&n?n:''}</span><div class="bw"><i class="${d===td?'tdy':''}" style="height:${n?Math.max(6,n/max*100):2}%"></i></div><span class="bl">${lab}</span></div>`;
+  }).join('');
+  const byProj={};
+  state.tasks.forEach(t=>{
+    const c=completionsOf(t).filter(d=>days.includes(d)).length;
+    if(c){const k=t.projectId||'';byProj[k]=(byProj[k]||0)+c}
+  });
+  const prow=Object.entries(byProj).sort((a,b)=>b[1]-a[1]).map(([k,n])=>({name:k?(state.projects.find(p=>p.id===k)?.name||'Проект'):'Без проекта',n}));
+  const pmax=Math.max(1,...prow.map(r=>r.n));
+  return `<div class="wide">
+    <div class="cal-bar"><div class="seg"><button data-sp="7" class="${statPeriod===7?'on':''}">Неделя</button><button data-sp="30" class="${statPeriod===30?'on':''}">Месяц</button></div></div>
+    <div class="s3">
+      <div class="stat pink"><span class="s-l">Задач сделано</span><span class="s-n">${total}</span></div>
+      <div class="stat yellow"><span class="s-l">Привычки</span><span class="s-n">${hs?hp+'%':'—'}</span></div>
+      <div class="stat blue"><span class="s-l">Просрочено</span><span class="s-n">${overdue}</span></div>
+    </div>
+    <div class="group-title">Выполнено задач по дням</div>
+    <div class="chart">${bars}</div>
+    ${hrows.length?'<div class="group-title">Привычки</div>'+hrows.map(r=>`<div class="hbar y"><span class="nm">${esc(r.h.name)}</span><div class="track"><div class="fill" style="width:${r.p}%"></div></div><span class="vl">${r.c}/${r.s}</span></div>`).join(''):''}
+    ${prow.length?'<div class="group-title">Выполнено по проектам</div>'+prow.map(r=>`<div class="hbar"><span class="nm">${esc(r.name)}</span><div class="track"><div class="fill" style="width:${Math.round(r.n/pmax*100)}%"></div></div><span class="vl">${r.n}</span></div>`).join(''):''}
+  </div>`;
+}
+function bindStats(){
+  $('list').querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{statPeriod=+b.dataset.sp;render()});
+}
+
 // --- диалог ---
 function fillProjects(sel){
   $('fProject').innerHTML='<option value="">Без проекта</option>'+state.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
@@ -511,7 +704,7 @@ function openDialog(id){
   $('dlg').showModal();
   if(!t)setTimeout(()=>$('fTitle').focus(),50);
 }
-$('fab').onclick=()=>openDialog();
+$('fab').onclick=()=>view.type==='habits'?openHabit():openDialog();
 $('fCancel').onclick=()=>$('dlg').close();
 document.querySelectorAll('.chips [data-q]').forEach(b=>b.onclick=()=>{
   const q=b.dataset.q;
@@ -564,15 +757,28 @@ let acStep='email',pendingEmail='',acText='';
 function mergeStates(a,b){
   const del={...(a.deleted||{})};
   for(const k in (b.deleted||{}))del[k]=Math.max(del[k]||0,b.deleted[k]);
+  const alive=it=>!(del[it.id]&&del[it.id]>=(it.u||0));
   const mergeList=(x,y)=>{
     const m=new Map();
     [...(x||[]),...(y||[])].forEach(it=>{
       const c=m.get(it.id);
       if(!c||(it.u||0)>(c.u||0))m.set(it.id,it);
     });
-    return [...m.values()].filter(it=>!(del[it.id]&&del[it.id]>=(it.u||0)));
+    return [...m.values()].filter(alive);
   };
-  return {projects:mergeList(a.projects,b.projects),tasks:mergeList(a.tasks,b.tasks),deleted:del};
+  const mergeHabits=(x,y)=>{
+    const m=new Map();
+    [...(x||[]),...(y||[])].forEach(h=>{
+      const c=m.get(h.id);
+      if(!c){m.set(h.id,h);return}
+      const base=(h.u||0)>(c.u||0)?h:c;
+      const log={...(c.log||{})};
+      for(const k in (h.log||{})){if(!(k in log)||Math.abs(h.log[k])>Math.abs(log[k]))log[k]=h.log[k]}
+      m.set(h.id,{...base,log,u:Math.max(h.u||0,c.u||0)});
+    });
+    return [...m.values()].filter(alive);
+  };
+  return {projects:mergeList(a.projects,b.projects),tasks:mergeList(a.tasks,b.tasks),habits:mergeHabits(a.habits,b.habits),deleted:del};
 }
 function initSb(){
   if(sb)return true;
