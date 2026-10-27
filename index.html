@@ -112,6 +112,28 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
 .f-row{display:flex;gap:10px}.f-row .f{flex:1;min-width:0}
 .actions{display:flex;justify-content:space-between;margin-top:8px}
 .scrim{display:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 10px}
+.chips button{border:0;background:var(--beige);border-radius:99px;padding:5px 12px;font-size:13px;font-weight:700;cursor:pointer}
+.cal-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.seg{display:flex;background:var(--beige);border-radius:99px;padding:3px}
+.seg button{border:0;background:none;padding:6px 14px;border-radius:99px;font-weight:700;cursor:pointer;color:var(--muted)}
+.seg button.on{background:var(--ink);color:#fff}
+.cal-nav{margin-left:auto;display:flex;gap:6px}
+.cal-nav button{width:36px;height:36px;border-radius:50%;border:0;background:var(--beige);cursor:pointer;font-size:16px;font-weight:700}
+.cal-nav .tdy{width:auto;padding:0 14px;border-radius:99px;font-size:13px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
+.cal-h{text-align:center;font-size:12px;font-weight:700;color:var(--muted);padding:2px 0}
+.cal-d{background:var(--card);border:1px solid var(--line);border-radius:16px;min-height:62px;padding:6px 2px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.cal-d.out{opacity:.45}
+.cal-d.sel{background:var(--pink);border-color:var(--pink)}
+.cal-d .n{font-weight:800;font-size:14px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.cal-d.today .n{background:var(--ink);color:#fff}
+.dots{display:flex;gap:3px;flex-wrap:wrap;justify-content:center}
+.dot{width:6px;height:6px;border-radius:50%}
+.dot.p1{background:var(--pink-d)}.dot.p2{background:var(--yellow-d)}.dot.p3{background:#6d83e8}.dot.dn{background:#b9b3a2}
+.more{font-size:10px;color:var(--muted);font-weight:700}
+@media (min-width:761px){.cal-d{min-height:84px}}
 .ac-note{font-size:12px;color:#8b877b;margin:2px 12px 6px;word-break:break-all}
 .ac-in{width:calc(100% - 8px);margin:2px 4px 6px;padding:9px 12px;border-radius:12px;border:1px solid #333;background:#222;color:#fff}
 .ac-in::placeholder{color:#8b877b}
@@ -175,6 +197,14 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
       <div class="f"><label>Срок</label><input type="date" id="fDate"></div>
       <div class="f"><label>Время</label><input type="time" id="fTime"></div>
     </div>
+    <div class="chips">
+      <button type="button" data-q="0">Сегодня</button><button type="button" data-q="1">Завтра</button>
+      <button type="button" data-q="7">Через неделю</button><button type="button" data-q="x">Без срока</button>
+    </div>
+    <div class="f"><label>Повтор</label>
+      <select id="fRepeat"><option value="">Не повторять</option><option value="daily">Каждый день</option>
+      <option value="weekdays">По будням</option><option value="weekly">Каждую неделю</option><option value="monthly">Каждый месяц</option></select>
+    </div>
     <div class="f-row">
       <div class="f"><label>Проект</label><select id="fProject"></select></div>
       <div class="f"><label>Приоритет</label>
@@ -203,6 +233,7 @@ const todayStr=()=>dstr(new Date());
 let state=load();
 let view={type:'today'}; // today | upcoming | inbox | all | done | project
 let editingId=null;
+let calMode='week',calAnchor=todayStr(),calSel=todayStr();
 
 function load(){
   try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.tasks){s.deleted=s.deleted||{};return s}}catch(e){}
@@ -244,7 +275,7 @@ function filtered(){
 function stats(){
   const td=todayStr();
   const open=state.tasks.filter(t=>!t.done);
-  const doneToday=state.tasks.filter(t=>t.done&&t.doneAt&&dstr(new Date(t.doneAt))===td).length;
+  const doneToday=state.tasks.filter(t=>t.done&&t.doneAt&&dstr(new Date(t.doneAt))===td).length+state.tasks.filter(t=>(t.hist||[]).includes(td)).length;
   const overdue=open.filter(t=>t.date&&t.date<td).length;
   const todayOpen=open.filter(t=>t.date&&t.date<=td).length;
   const upcoming=open.filter(t=>t.date&&t.date>td).length;
@@ -284,7 +315,7 @@ function render(){
     all:open.length,
     done:state.tasks.length-open.length
   };
-  const smart=[['today','Сегодня'],['upcoming','Предстоящие'],['inbox','Входящие'],['all','Все'],['done','Выполнено']];
+  const smart=[['today','Сегодня'],['calendar','Календарь'],['upcoming','Предстоящие'],['inbox','Входящие'],['all','Все'],['done','Выполнено']];
   $('smart').innerHTML=smart.map(([k,n])=>navBtn(k,n,counts[k],view.type===k)).join('');
   $('projects').innerHTML=state.projects.map(p=>{
     const c=open.filter(t=>t.projectId===p.id).length;
@@ -302,6 +333,13 @@ function render(){
   const ds=new Date().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
   $('sub').textContent=ds.charAt(0).toUpperCase()+ds.slice(1);
   $('delProject').hidden=view.type!=='project';
+  if(view.type==='calendar'){
+    const m=new Date(calAnchor+'T00:00').toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
+    $('sub').textContent=m.charAt(0).toUpperCase()+m.slice(1);
+    $('list').innerHTML=calHtml();
+    bindList();bindCal();
+    return;
+  }
 
   const items=filtered();
   const dash=view.type==='today'?dashHtml():'';
@@ -332,9 +370,11 @@ function taskHtml(t){
           ${t.date?`<span class="pill ${late?'late':'date'}">${fmtDate(t)}</span>`:''}
           ${proj?`<span class="pill proj">${esc(proj.name)}</span>`:''}
           ${(t.subs||[]).length?`<span class="pill">${sd}/${t.subs.length}</span>`:''}
+          ${t.repeat?`<span class="pill">↻ ${REPEAT_LABEL[t.repeat]||''}</span>`:''}
           ${t.note?`<span class="note-t">${esc(t.note.slice(0,60))}</span>`:''}
         </div>
       </div>
+      ${t.done?'':`<button class="icon-btn" data-postpone="${t.id}" title="Перенести на завтра" aria-label="Перенести на завтра">↷</button>`}
     </div>
     ${subs?`<div class="subs">${subs}</div>`:''}
     ${t.done?'':`<div class="sub-add"><input data-subadd="${t.id}" placeholder="+ Подзадача" enterkeyhint="done"></div>`}
@@ -345,10 +385,15 @@ function bindList(){
   L.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{view={type:b.dataset.go};render()});
   L.querySelectorAll('[data-chk]').forEach(b=>b.onclick=()=>{
     const t=state.tasks.find(x=>x.id===b.dataset.chk);
-    t.done=!t.done;t.doneAt=t.done?Date.now():null;touch(t);
+    if(t.repeat&&!t.done){(t.hist=t.hist||[]).push(todayStr());t.date=nextOccurrence(t);touch(t)}
+    else{t.done=!t.done;t.doneAt=t.done?Date.now():null;touch(t)}
     save();render();
   });
   L.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openDialog(b.dataset.edit));
+  L.querySelectorAll('[data-postpone]').forEach(b=>b.onclick=()=>{
+    const t=state.tasks.find(x=>x.id===b.dataset.postpone);
+    t.date=addDays(todayStr(),1);touch(t);save();render();
+  });
   L.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{
     const t=state.tasks.find(x=>x.id===b.dataset.t);
     const s=t.subs.find(x=>x.id===b.dataset.sub);s.done=!s.done;touch(t);save();render();
@@ -367,6 +412,78 @@ function bindList(){
   }));
 }
 
+// --- даты, повторы, календарь ---
+const REPEAT_LABEL={daily:'каждый день',weekdays:'по будням',weekly:'каждую неделю',monthly:'каждый месяц'};
+const MONTH_DATE=s=>new Date(s+'T00:00');
+function addDays(s,n){const d=MONTH_DATE(s);d.setDate(d.getDate()+n);return dstr(d)}
+function startOfWeek(s){const d=MONTH_DATE(s);return addDays(s,-((d.getDay()+6)%7))}
+function nextOccurrence(t){
+  const td=todayStr();
+  const step=s=>{
+    const x=MONTH_DATE(s);
+    if(t.repeat==='daily')x.setDate(x.getDate()+1);
+    else if(t.repeat==='weekly')x.setDate(x.getDate()+7);
+    else if(t.repeat==='weekdays'){do{x.setDate(x.getDate()+1)}while(x.getDay()===0||x.getDay()===6)}
+    else if(t.repeat==='monthly'){
+      const day=x.getDate();x.setDate(1);x.setMonth(x.getMonth()+1);
+      const last=new Date(x.getFullYear(),x.getMonth()+1,0).getDate();x.setDate(Math.min(day,last));
+    }
+    return dstr(x);
+  };
+  let d=step(t.date||td),g=0;
+  while(d<=td&&g++<400)d=step(d);
+  return d;
+}
+function calHtml(){
+  const days=[];
+  if(calMode==='week'){
+    const st=startOfWeek(calAnchor);for(let i=0;i<7;i++)days.push(addDays(st,i));
+  }else{
+    const a=MONTH_DATE(calAnchor);
+    const first=dstr(new Date(a.getFullYear(),a.getMonth(),1));
+    const last=dstr(new Date(a.getFullYear(),a.getMonth()+1,0));
+    let st=startOfWeek(first);
+    while(st<=last||days.length%7!==0){days.push(st);st=addDays(st,1)}
+  }
+  const curM=MONTH_DATE(calAnchor).getMonth(),td=todayStr();
+  const byDay={};
+  state.tasks.forEach(t=>{if(t.date)(byDay[t.date]=byDay[t.date]||[]).push(t)});
+  const cells=days.map(d=>{
+    const list=(byDay[d]||[]).slice().sort((a,b)=>(a.done-b.done)||(a.prio-b.prio));
+    const dots=list.slice(0,4).map(t=>`<i class="dot ${t.done?'dn':'p'+t.prio}"></i>`).join('');
+    const more=list.length>4?`<span class="more">+${list.length-4}</span>`:'';
+    const out=calMode==='month'&&MONTH_DATE(d).getMonth()!==curM;
+    return `<div class="cal-d${d===calSel?' sel':''}${d===td?' today':''}${out?' out':''}" data-day="${d}">
+      <span class="n">${MONTH_DATE(d).getDate()}</span><div class="dots">${dots}${more}</div></div>`;
+  }).join('');
+  const heads=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(h=>`<div class="cal-h">${h}</div>`).join('');
+  const dayList=(byDay[calSel]||[]).slice().sort((a,b)=>(a.done-b.done)||((a.time||'99')<(b.time||'99')?-1:1));
+  const ds=MONTH_DATE(calSel).toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+  return `<div class="cal-bar">
+      <div class="seg"><button data-mode="week" class="${calMode==='week'?'on':''}">Неделя</button><button data-mode="month" class="${calMode==='month'?'on':''}">Месяц</button></div>
+      <div class="cal-nav"><button data-nav="-1" aria-label="Назад">‹</button><button class="tdy" data-nav="0">Сегодня</button><button data-nav="1" aria-label="Вперёд">›</button></div>
+    </div>
+    <div class="cal-grid">${heads}${cells}</div>
+    <div class="group-title">${ds.charAt(0).toUpperCase()+ds.slice(1)}</div>
+    ${dayList.length?dayList.map(taskHtml).join(''):'<div class="empty" style="margin-top:16px">Нет задач на этот день.<br>Нажмите «+», чтобы добавить.</div>'}`;
+}
+function bindCal(){
+  const L=$('list');
+  L.querySelectorAll('[data-day]').forEach(c=>c.onclick=()=>{
+    calSel=c.dataset.day;
+    if(calMode==='month')calAnchor=calSel;
+    render();
+  });
+  L.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{calMode=b.dataset.mode;calAnchor=calSel;render()});
+  L.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{
+    const n=+b.dataset.nav;
+    if(n===0){calAnchor=calSel=todayStr()}
+    else if(calMode==='week'){calAnchor=addDays(calAnchor,7*n);calSel=calAnchor}
+    else{const a=MONTH_DATE(calAnchor);calAnchor=dstr(new Date(a.getFullYear(),a.getMonth()+n,1));calSel=calAnchor}
+    render();
+  });
+}
+
 // --- диалог ---
 function fillProjects(sel){
   $('fProject').innerHTML='<option value="">Без проекта</option>'+state.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
@@ -378,7 +495,8 @@ function openDialog(id){
   $('dlgTitle').textContent=t?'Задача':'Новая задача';
   $('fTitle').value=t?t.title:'';
   $('fNote').value=t?(t.note||''):'';
-  $('fDate').value=t?(t.date||''):(view.type==='today'?todayStr():'');
+  $('fDate').value=t?(t.date||''):(view.type==='today'?todayStr():view.type==='calendar'?calSel:'');
+  $('fRepeat').value=t?(t.repeat||''):'';
   $('fTime').value=t?(t.time||''):'';
   $('fPrio').value=t?String(t.prio):'3';
   fillProjects(t?t.projectId:(view.type==='project'?view.id:''));
@@ -388,6 +506,10 @@ function openDialog(id){
 }
 $('fab').onclick=()=>openDialog();
 $('fCancel').onclick=()=>$('dlg').close();
+document.querySelectorAll('.chips [data-q]').forEach(b=>b.onclick=()=>{
+  const q=b.dataset.q;
+  $('fDate').value=q==='x'?'':addDays(todayStr(),+q);
+});
 $('fDelete').onclick=()=>{
   if(!confirm('Удалить задачу?'))return;
   state.deleted[editingId]=Date.now();
@@ -398,7 +520,8 @@ $('form').addEventListener('submit',()=>{
   const title=$('fTitle').value.trim();
   if(!title)return;
   const data={title,note:$('fNote').value.trim(),date:$('fDate').value,time:$('fTime').value,
-    prio:+$('fPrio').value,projectId:$('fProject').value||null};
+    prio:+$('fPrio').value,projectId:$('fProject').value||null,repeat:$('fRepeat').value};
+  if(data.repeat&&!data.date)data.date=todayStr();
   if(editingId){touch(Object.assign(state.tasks.find(t=>t.id===editingId),data))}
   else state.tasks.push(touch({id:uid(),done:false,subs:[],created:Date.now(),...data}));
   save();render();
