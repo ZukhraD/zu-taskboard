@@ -1,5 +1,5 @@
-const CACHE = 'taskapp-v3';
-const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-180.png'];
+const CACHE = 'taskapp-v4';
+const FILES = ['./', './index.html', './style.css', './app.js', './parser.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-180.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -13,17 +13,16 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Сначала сеть (чтобы обновления приходили сразу), при отсутствии интернета — кэш
+// Сначала сеть (обновления приходят сразу), без интернета — кэш
+const OK_HOSTS = ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const u = new URL(e.request.url);
-  const ok = u.origin === location.origin || ['cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'].includes(u.hostname);
-  if (!ok) return; // запросы к базе (Supabase) не кэшируем
+  if (u.origin !== self.location.origin && !OK_HOSTS.includes(u.hostname)) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
         return res;
       })
       .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
