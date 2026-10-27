@@ -362,6 +362,35 @@ $('quick').addEventListener('submit',e=>{
   });
 });
 
+// ---------- ИИ-разбор (Gemini через /api/parse) ----------
+$('qAi').onclick=async()=>{
+  const v=$('qInput').value.trim();
+  if(!v){toast('Вставьте сообщение в строку, потом нажмите «ИИ»');return}
+  if(!session){toast('ИИ-разбор доступен после входа: Ещё → Настройки → Аккаунт');return}
+  const btn=$('qAi');btn.disabled=true;btn.textContent='…';
+  try{
+    const r=await fetch('/api/parse',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},
+      body:JSON.stringify({text:v,today:todayStr(),projects:state.projects.map(p=>p.name)})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||('http '+r.status));
+    const added=[];
+    (j.tasks||[]).forEach(t=>{
+      let pid=null;
+      if(t.project){const p=state.projects.find(x=>x.name.toLowerCase()===t.project.toLowerCase());if(p)pid=p.id}
+      const task=touch({id:uid(),title:t.title,note:'',date:t.date||'',time:t.time||'',prio:t.prio||3,projectId:pid,repeat:'',done:false,subs:[],created:Date.now()});
+      state.tasks.push(task);added.push(task.id);
+    });
+    if(!added.length){toast('ИИ не нашёл задач в тексте')}
+    else{
+      $('qInput').value='';$('qPrev').innerHTML='';save();render();
+      toast('ИИ добавил задач: '+added.length,()=>{added.forEach(id=>{state.deleted[id]=Date.now()});state.tasks=state.tasks.filter(t=>!added.includes(t.id));save();render()});
+    }
+  }catch(e){
+    toast(e.message==='no_key'?'Ключ Gemini не подхвачен: нужен Redeploy в Vercel':'ИИ недоступен ('+e.message+'). Используйте обычный ввод');
+  }
+  btn.disabled=false;btn.textContent='ИИ';
+};
+
 // ---------- даты, повторы, календарь ----------
 const REPEAT_LABEL={daily:'каждый день',weekdays:'по будням',weekly:'каждую неделю',monthly:'каждый месяц'};
 const MONTH_DATE=s=>new Date(s+'T00:00');
