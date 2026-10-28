@@ -266,3 +266,27 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
+
+/* ---- доска ---- */
+.boardf{margin-bottom:12px}
+.boardf button.on{background:var(--btn);color:var(--btn-fg)}
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start;grid-column:1/-1}
+.kcol{background:var(--beige);border-radius:20px;padding:12px;min-height:200px;transition:outline-color .15s;outline:2px dashed transparent}
+.kcol.over{outline-color:var(--fg)}
+.kcol h3{margin:2px 6px 10px;font-size:14px;font-weight:800;display:flex;justify-content:space-between}
+.kcol h3 span{color:var(--muted,#6b6659);font-weight:700}
+.kcol[data-col=todo] h3{border-left:5px solid #f6b5d3;padding-left:8px}
+.kcol[data-col=doing] h3{border-left:5px solid #f6d96b;padding-left:8px}
+.kcol[data-col=done] h3{border-left:5px solid #a9ddc9;padding-left:8px}
+.kbody{display:flex;flex-direction:column;gap:8px}
+.kcard{background:var(--card);border-radius:14px;padding:12px;cursor:grab;border-left:4px solid var(--line)}
+.kcard.p1{border-left-color:#e0699b}.kcard.p2{border-left-color:#e3b93c}
+.kcard.drag{opacity:.45}.kcard.kdone{opacity:.7}
+.kcard .t-title{font-weight:700;font-size:15px;cursor:pointer}
+.kmove{display:flex;justify-content:space-between;margin-top:6px}
+.kmove button{width:44px;height:36px;border:0;border-radius:10px;background:var(--beige);color:var(--fg);font-size:20px;cursor:pointer}
+.kempty{color:var(--muted,#6b6659);font-size:13px;padding:14px;text-align:center}
+@media (max-width:760px){
+  .board{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin:0 -16px;padding:0 16px 8px}
+  .kcol{flex:0 0 84%;scroll-snap-align:center}
+}

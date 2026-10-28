@@ -5,13 +5,14 @@ const $=id=>document.getElementById(id);
 const dstr=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const todayStr=()=>dstr(new Date());
 const PALETTE=['#f6b5d3','#b7c3f3','#f6d96b','#a9ddc9','#d4c2f2','#f7c9a0','#c7d98a'];
-const TITLES={today:'Сегодня',calendar:'Календарь',inbox:'Входящие',upcoming:'Предстоящие',all:'Все задачи',done:'Выполнено',habits:'Привычки',stats:'Итоги',settings:'Настройки'};
-const QUICK_VIEWS=['today','calendar','inbox','upcoming','all','project'];
+const TITLES={today:'Сегодня',board:'Доска',calendar:'Календарь',inbox:'Входящие',upcoming:'Предстоящие',all:'Все задачи',done:'Выполнено',habits:'Привычки',stats:'Итоги',settings:'Настройки'};
+const QUICK_VIEWS=['today','board','calendar','inbox','upcoming','all','project'];
 
 let state=load();
 let settings=loadSettings();
 let view={type:'today'}; // today | calendar | inbox | upcoming | all | done | habits | stats | settings | project
 let editingId=null, lastPop=null;
+let boardProj='';
 let calMode='week',calAnchor=todayStr(),calSel=todayStr();
 
 function load(){
@@ -114,7 +115,7 @@ function navBtn(k,name,c,active,color){
 function renderNav(counts){
   const on=k=>view.type===k;
   const grp=(title,items)=>(title?`<div class="nav-title">${title}</div>`:'')+items.map(k=>navBtn(k,TITLES[k],counts[k],on(k))).join('');
-  $('nav').innerHTML=grp('',['today','calendar','inbox','upcoming','all'])+grp('Отслеживание',['habits','stats']);
+  $('nav').innerHTML=grp('',['today','board','calendar','inbox','upcoming','all'])+grp('Отслеживание',['habits','stats']);
   $('nav2').innerHTML=grp('Ещё',['done','settings']);
   $('projects').innerHTML=state.projects.map(p=>{
     const c=state.tasks.filter(t=>!t.done&&t.projectId===p.id).length;
@@ -165,6 +166,10 @@ function render(){
   $('quickwrap').style.display=QUICK_VIEWS.includes(view.type)?'':'none';
   document.title=title+' · Задачи';
 
+  if(view.type==='board'){
+    $('sub').textContent='Перетаскивайте карточки или двигайте стрелками';
+    $('list').innerHTML=boardHtml();bindBoard();return;
+  }
   if(view.type==='calendar'){
     const m=new Date(calAnchor+'T00:00').toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
     $('sub').textContent=m.charAt(0).toUpperCase()+m.slice(1);
@@ -347,6 +352,7 @@ $('quick').addEventListener('submit',e=>{
   let projectId=r.projectId;
   if(!projectId&&r.projectName)projectId=newProject(r.projectName).id;
   if(!projectId&&view.type==='project')projectId=view.id;
+  if(!projectId&&view.type==='board'&&boardProj)projectId=boardProj;
   let date=r.date;
   if(!date){
     if(view.type==='today')date=todayStr();
@@ -361,6 +367,54 @@ $('quick').addEventListener('submit',e=>{
     state.deleted[task.id]=Date.now();state.tasks=state.tasks.filter(x=>x.id!==task.id);save();render();
   });
 });
+
+// ---------- доска (канбан) ----------
+const COLS=[['todo','К выполнению'],['doing','В работе'],['done','Готово']];
+const colOf=t=>t.done?'done':(t.status==='doing'?'doing':'todo');
+function boardHtml(){
+  const td=todayStr(),weekAgo=Date.now()-14*864e5;
+  let l=state.tasks.filter(t=>!boardProj||t.projectId===boardProj);
+  l=l.filter(t=>!t.done||(t.doneAt||0)>weekAgo||!t.doneAt);
+  l.sort((a,b)=>(a.prio-b.prio)||((a.date||'9999')<(b.date||'9999')?-1:1));
+  const chip=(id,name)=>`<button data-bp="${id}" class="${boardProj===id?'on':''}">${esc(name)}</button>`;
+  const filter=`<div class="chips boardf">${chip('','Все проекты')}${state.projects.map(p=>chip(p.id,p.name)).join('')}</div>`;
+  const cols=COLS.map(([k,name],ci)=>{
+    const items=l.filter(t=>colOf(t)===k);
+    const cards=items.map(t=>{
+      const proj=t.projectId?state.projects.find(p=>p.id===t.projectId):null;
+      const late=!t.done&&t.date&&t.date<td;
+      return `<div class="kcard p${t.prio}${t.done?' kdone':''}" draggable="true" data-kid="${t.id}">
+        <div class="t-title${t.done?' done-t':''}" data-edit="${t.id}">${esc(t.title)}</div>
+        <div class="meta">${t.date?`<span class="pill ${late?'late':'date'}">${fmtDate(t)}</span>`:''}${proj?`<span class="pill proj" style="--pc:${projColor(proj)}">${esc(proj.name)}</span>`:''}${(t.subs||[]).length?`<span class="pill">${t.subs.filter(s=>s.done).length}/${t.subs.length}</span>`:''}</div>
+        <div class="kmove">${ci>0?`<button data-kmove="${t.id}|${COLS[ci-1][0]}" aria-label="В колонку ${COLS[ci-1][1]}">‹</button>`:'<span></span>'}${ci<2?`<button data-kmove="${t.id}|${COLS[ci+1][0]}" aria-label="В колонку ${COLS[ci+1][1]}">›</button>`:'<span></span>'}</div>
+      </div>`;
+    }).join('');
+    return `<section class="kcol" data-col="${k}"><h3>${name}<span>${items.length}</span></h3><div class="kbody">${cards||'<div class="kempty">Пусто</div>'}</div></section>`;
+  }).join('');
+  return filter+`<div class="board">${cols}</div>`;
+}
+function moveTask(id,col){
+  const t=taskById(id);if(!t||colOf(t)===col)return;
+  if(col==='done'){completeTask(id);return}
+  const snap={done:!!t.done,doneAt:t.doneAt||null,status:t.status||'todo'};
+  t.done=false;t.doneAt=null;t.status=col;touch(t);save();render();
+  toast('Перенёс в «'+COLS.find(c=>c[0]===col)[1]+'»',()=>{const c=taskById(id);if(!c)return;Object.assign(c,snap);touch(c);save();render()});
+}
+function bindBoard(){
+  const L=$('list');
+  L.querySelectorAll('[data-bp]').forEach(b=>b.onclick=()=>{boardProj=b.dataset.bp;render()});
+  L.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openDialog(b.dataset.edit));
+  L.querySelectorAll('[data-kmove]').forEach(b=>b.onclick=()=>{const [id,c]=b.dataset.kmove.split('|');moveTask(id,c)});
+  L.querySelectorAll('.kcard').forEach(c=>{
+    c.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',c.dataset.kid);e.dataTransfer.effectAllowed='move';c.classList.add('drag')});
+    c.addEventListener('dragend',()=>c.classList.remove('drag'));
+  });
+  L.querySelectorAll('.kcol').forEach(col=>{
+    col.addEventListener('dragover',e=>{e.preventDefault();col.classList.add('over')});
+    col.addEventListener('dragleave',()=>col.classList.remove('over'));
+    col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('over');const id=e.dataTransfer.getData('text/plain');if(id)moveTask(id,col.dataset.col)});
+  });
+}
 
 // ---------- ИИ-разбор (Gemini через /api/parse) ----------
 $('qAi').onclick=async()=>{
