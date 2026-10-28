@@ -917,6 +917,7 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
 applyTheme();
+if(window.innerWidth<=760)$('qInput').placeholder='Новая задача…';
 render();
 initAuth();
 })();
