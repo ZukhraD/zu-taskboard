@@ -822,37 +822,27 @@ function renderAcct(){
     $('acOut').onclick=async()=>{await sb.auth.signOut();session=null;lastSync=null;acStep='email';acText='';renderAcct()};
     return;
   }
-  if(acStep==='email'){
-    el.innerHTML=`<input class="ac-in" id="acEmail" type="email" inputmode="email" autocomplete="email" placeholder="Ваша почта" aria-label="Почта">
-      <div class="acts"><button class="btn pink" id="acSend">Получить код</button></div>
-      <div class="ac-note" style="margin-top:8px">${esc(acText)}</div>`;
-    $('acSend').onclick=sendCode;
-    $('acEmail').addEventListener('keydown',e=>{if(e.key==='Enter')sendCode()});
-  }else{
-    el.innerHTML=`<div class="ac-note">Код отправлен на ${esc(pendingEmail)}</div>
-      <input class="ac-in" id="acCode" inputmode="numeric" autocomplete="one-time-code" placeholder="Код из письма" aria-label="Код из письма">
-      <div class="acts"><button class="btn pink" id="acVerify">Войти</button><button class="btn soft" id="acBack">Назад</button></div>
-      <div class="ac-note" style="margin-top:8px">${esc(acText)}</div>`;
-    $('acVerify').onclick=verifyCode;
-    $('acBack').onclick=()=>{acStep='email';acText='';renderAcct()};
-    $('acCode').addEventListener('keydown',e=>{if(e.key==='Enter')verifyCode()});
+  el.innerHTML=`<input class="ac-in" id="acEmail" type="email" inputmode="email" autocomplete="email" placeholder="Почта" aria-label="Почта" value="${esc(pendingEmail)}">
+    <input class="ac-in" id="acPass" type="password" autocomplete="current-password" placeholder="Пароль (от 6 символов)" aria-label="Пароль" style="margin-top:8px">
+    <div class="acts"><button class="btn pink" id="acIn">Войти</button><button class="btn soft" id="acUp">Создать аккаунт</button></div>
+    <div class="ac-note" style="margin-top:8px">${esc(acText)}</div>`;
+  $('acIn').onclick=()=>passAuth(false);
+  $('acUp').onclick=()=>passAuth(true);
+  $('acPass').addEventListener('keydown',e=>{if(e.key==='Enter')passAuth(false)});
+}
+async function passAuth(signup){
+  const email=$('acEmail').value.trim(),password=$('acPass').value;
+  pendingEmail=email;
+  if(!email||password.length<6){acMsg('Введите почту и пароль не короче 6 символов');return}
+  $('acIn').disabled=$('acUp').disabled=true;
+  const {data,error}=signup?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});
+  if(error){
+    const m=error.message||'';
+    acMsg(/invalid login/i.test(m)?'Неверная почта или пароль (или аккаунта ещё нет: нажмите «Создать аккаунт»)':/already/i.test(m)?'Такой аккаунт уже есть: нажмите «Войти»':/confirm/i.test(m)?'Почта не подтверждена: отключите Confirm email в Supabase':m);
+    return;
   }
-}
-async function sendCode(){
-  const email=$('acEmail').value.trim();
-  if(!email){acMsg('Введите почту');return}
-  $('acSend').disabled=true;
-  const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
-  if(error){acMsg(error.message);return}
-  pendingEmail=email;acStep='code';acText='';renderAcct();
-}
-async function verifyCode(){
-  const token=$('acCode').value.trim();
-  if(!token)return;
-  $('acVerify').disabled=true;
-  const {error}=await sb.auth.verifyOtp({email:pendingEmail,token,type:'email'});
-  if(error){acMsg('Неверный или просроченный код');return}
-  acStep='email';acText='';
+  if(signup&&!data.session){acMsg('Аккаунт создан, но нужен вход: в Supabase отключите Confirm email, затем нажмите «Войти»');return}
+  acText='';
 }
 async function initAuth(){
   if(!initSb()){renderAcct();return}

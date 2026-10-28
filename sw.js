@@ -1,4 +1,4 @@
-const CACHE = 'taskapp-v4';
+const CACHE = 'taskapp-v5';
 const FILES = ['./', './index.html', './style.css', './app.js', './parser.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-180.png'];
 
 self.addEventListener('install', e => {
