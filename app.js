@@ -21,7 +21,7 @@ function load(){
   return {projects:[],tasks:[],deleted:{},habits:[]};
 }
 function loadSettings(){
-  try{return Object.assign({theme:'auto'},JSON.parse(localStorage.getItem(SKEY))||{})}catch(e){return {theme:'auto'}}
+  try{return Object.assign({theme:'auto',pushLead:0,pushDigest:''},JSON.parse(localStorage.getItem(SKEY))||{})}catch(e){return {theme:'auto',pushLead:0,pushDigest:''}}
 }
 function saveSettings(){try{localStorage.setItem(SKEY,JSON.stringify(settings))}catch(e){}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){alert('Не удалось сохранить данные')}scheduleSync()}
@@ -132,7 +132,7 @@ function renderNav(counts){
     b.classList.toggle('on',k==='more'?!main.includes(view.type):view.type===k);
   });
 }
-function go(v){view=v;closeMenu();render();const L=$('list');if(L)L.scrollTop=0}
+function go(v){view=v;pushMsg='';closeMenu();render();const L=$('list');if(L)L.scrollTop=0}
 function openMenu(){$('side').classList.add('open');$('scrim').classList.add('show')}
 function closeMenu(){$('side').classList.remove('open');$('scrim').classList.remove('show')}
 $('scrim').onclick=closeMenu;
@@ -662,6 +662,7 @@ function settingsHtml(){
   return `<div class="wide">
     <div class="card"><h3>Внешний вид</h3><div class="seg" id="themeSeg">${b('auto','Авто')}${b('light','Светлая')}${b('dark','Тёмная')}</div></div>
     <div class="card"><h3>Аккаунт и синхронизация</h3><div class="acct" id="acct"></div></div>
+    <div class="card"><h3>Уведомления</h3><div id="pushbox"><div class="ac-note">Загрузка…</div></div></div>
     <div class="card"><h3>Данные</h3>
       <div class="acts"><button class="btn soft" id="exportBtn">Экспорт</button><button class="btn soft" id="importBtn">Импорт</button><button class="btn danger" id="clearDone2">Очистить выполненные</button></div>
       <div class="row"><small>Экспорт сохраняет копию всех задач в файл на случай потери данных.</small></div>
@@ -688,6 +689,7 @@ function bindSettings(){
   };
   $('importBtn').onclick=()=>$('importFile').click();
   $('clearDone2').onclick=clearDone;
+  renderPush();
 }
 $('importFile').onchange=e=>{
   const f=e.target.files[0];if(!f)return;
@@ -701,6 +703,94 @@ $('importFile').onchange=e=>{
   };
   r.readAsText(f);e.target.value='';
 };
+
+
+// ---------- push-уведомления ----------
+const VAPID_PUB='BKzbNEL5Jt40EOTRrGUWS3nLPybpHYtNHVWSba7j3z6vkqwVGSn86EQh5jT_SMUCztDuBBNMzdIOluonJ081eAs';
+const pushSupported=()=>'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>window.navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+function b64ToU8(u){const p='='.repeat((4-u.length%4)%4),s=(u+p).replace(/-/g,'+').replace(/_/g,'/'),r=atob(s);const o=new Uint8Array(r.length);for(let i=0;i<r.length;i++)o[i]=r.charCodeAt(i);return o}
+async function curSub(){
+  try{const reg=await navigator.serviceWorker.getRegistration();return reg?await reg.pushManager.getSubscription():null}catch(e){return null}
+}
+async function savePushRow(sub){
+  if(!session||!initSb()||!sub)return;
+  const {error}=await sb.from('push_subs').upsert({endpoint:sub.endpoint,user_id:session.user.id,sub:sub.toJSON(),
+    lead_min:+settings.pushLead||0,digest:settings.pushDigest||'',tz:(Intl.DateTimeFormat().resolvedOptions().timeZone)||'UTC',updated_at:new Date().toISOString()});
+  if(error)throw error;
+}
+async function refreshPush(){
+  try{if(pushSupported()&&Notification.permission==='granted'&&session){const s=await curSub();if(s)await savePushRow(s)}}catch(e){}
+}
+let pushMsg='';
+async function enablePush(){
+  pushMsg='';
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){pushMsg='Разрешение не выдано';return renderPush()}
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(VAPID_PUB)});
+    await savePushRow(sub);
+    pushMsg='Уведомления включены';
+  }catch(e){pushMsg='Не удалось включить: '+((e&&e.message)||e)}
+  renderPush();
+}
+async function disablePush(){
+  try{
+    const s=await curSub();
+    if(s){if(session&&initSb())await sb.from('push_subs').delete().eq('endpoint',s.endpoint);await s.unsubscribe()}
+    pushMsg='Уведомления выключены';
+  }catch(e){pushMsg='Ошибка: '+((e&&e.message)||e)}
+  renderPush();
+}
+async function testPush(){
+  pushMsg='Отправляю…';renderPush();
+  try{
+    const r=await fetch('/api/test',{method:'POST',headers:{Authorization:'Bearer '+session.access_token}});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok)pushMsg='Отправлено ('+(j.results||[]).map(x=>x==='ok'?'доставлено':x).join(', ')+'). Если ничего не пришло, проверьте уведомления в настройках телефона.';
+    else if(j.error==='not_configured')pushMsg='На сервере не заданы ключи (SUPABASE_SERVICE_KEY, VAPID_PRIVATE_KEY, CRON_SECRET в Vercel). Нужен Redeploy.';
+    else if(j.error==='no_subscription')pushMsg='Это устройство не подписано: нажмите «Включить».';
+    else pushMsg='Ошибка: '+(j.error||r.status);
+  }catch(e){pushMsg='Нет связи с сервером'}
+  renderPush();
+}
+async function renderPush(){
+  const el=$('pushbox');if(!el)return;
+  const note=t=>`<div class="ac-note">${t}</div>`;
+  let html='';
+  if(!pushSupported()){
+    html=isIOS()&&!isStandalone()
+      ?note('На iPhone и iPad уведомления работают только в приложении с экрана «Домой»: в Safari нажмите «Поделиться» → «На экран “Домой”», откройте приложение оттуда и вернитесь сюда.')
+      :note('Этот браузер не поддерживает уведомления.');
+  }else if(!session){
+    html=note('Сначала войдите в аккаунт (блок выше): уведомления привязаны к нему.');
+  }else if(Notification.permission==='denied'){
+    html=note('Уведомления запрещены. Разрешите их в настройках устройства: iPhone — Настройки → Уведомления → Задачи; браузер — значок замка рядом с адресом.');
+  }else{
+    const sub=await curSub();
+    if(!$('pushbox'))return;
+    if(sub&&Notification.permission==='granted'){
+      const lead=[[0,'В назначенное время'],[10,'За 10 минут'],[30,'За 30 минут'],[60,'За час']].map(([v,n])=>`<option value="${v}"${+settings.pushLead===v?' selected':''}>${n}</option>`).join('');
+      const dg=[['','Выключена'],['07:00','7:00'],['08:00','8:00'],['09:00','9:00'],['10:00','10:00']].map(([v,n])=>`<option value="${v}"${settings.pushDigest===v?' selected':''}>${n}</option>`).join('');
+      html=`<div class="f"><label for="pLead">Напоминать о задачах со временем</label><select id="pLead">${lead}</select></div>
+        <div class="f" style="margin-top:10px"><label for="pDigest">Утренняя сводка «план на сегодня»</label><select id="pDigest">${dg}</select></div>
+        <div class="acts"><button class="btn soft" id="pTest">Проверить</button><button class="btn ghost" id="pOff">Выключить</button></div>`;
+    }else{
+      html=note('Уведомления приходят на экран блокировки, даже когда приложение закрыто.')+'<div class="acts"><button class="btn pink" id="pOn">Включить уведомления</button></div>';
+    }
+  }
+  if(pushMsg)html+=note(esc(pushMsg));
+  el.innerHTML=html;
+  const on=$('pOn');if(on)on.onclick=enablePush;
+  const off=$('pOff');if(off)off.onclick=disablePush;
+  const ts=$('pTest');if(ts)ts.onclick=testPush;
+  const save=async()=>{try{const s=await curSub();await savePushRow(s);pushMsg='Сохранено'}catch(e){pushMsg='Не удалось сохранить: '+((e&&e.message)||e)}renderPush()};
+  const pl=$('pLead');if(pl)pl.onchange=()=>{settings.pushLead=+pl.value;saveSettings();save()};
+  const pd=$('pDigest');if(pd)pd.onchange=()=>{settings.pushDigest=pd.value;saveSettings();save()};
+}
 
 // ---------- поиск ----------
 function openSearch(){
@@ -906,10 +996,10 @@ async function initAuth(){
   session=data.session;
   sb.auth.onAuthStateChange((ev,s)=>{
     const was=!!session;session=s;
-    if(s&&!was){renderAcct();syncNow()}else if(!s&&was){renderAcct()}
+    if(s&&!was){renderAcct();syncNow();refreshPush();renderPush()}else if(!s&&was){renderAcct();renderPush()}
   });
   renderAcct();
-  if(session)syncNow();
+  if(session){syncNow();refreshPush()}
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow()});
   window.addEventListener('online',syncNow);
   setInterval(()=>{if(!document.hidden)syncNow()},60000);
