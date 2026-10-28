@@ -312,3 +312,37 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
   .kcol h3 span{margin-left:auto}
   .kcol h3{gap:8px}
 }
+
+/* ===== Мягкие цвета: плашки зависят от темы ===== */
+:root{
+  --tp-bg:var(--pink);--tp-fg:#141414; --tb-bg:var(--blue);--tb-fg:#141414;
+  --ty-bg:var(--yellow);--ty-fg:#141414; --tg-bg:var(--green);--tg-fg:#141414;
+  --ring-hole:var(--card);
+}
+.stat.pink{background:var(--tp-bg);color:var(--tp-fg)}
+.stat.blue{background:var(--tb-bg);color:var(--tb-fg)}
+.stat.yellow{background:var(--ty-bg);color:var(--ty-fg)}
+.pill.date{background:var(--ty-bg);color:var(--ty-fg)}
+.pill.late,.pill.prio{background:var(--tp-bg);color:var(--tp-fg)}
+.pill.ok{background:var(--tg-bg);color:var(--tg-fg)}
+.pill.proj{background:var(--pc,var(--blue));color:var(--on-pastel)}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+    --pink:#c98aa9;--blue:#8c98c8;--yellow:#c4ab5a;--green:#86ad98;
+    --tp-bg:#3a2833;--tp-fg:#efb4cf; --tb-bg:#262b40;--tb-fg:#b9c4f0;
+    --ty-bg:#3a3320;--ty-fg:#e9d284; --tg-bg:#233329;--tg-fg:#a9d6bb;
+    --btn:#d8d3c6;--fg:#e7e3d9;--pink-d:#d6709f;--yellow-d:#c9a32a;--blue-d:#8196e6;
+  }
+  :root:not([data-theme=light]) .nav-item.active,:root:not([data-theme=light]) .nav-item.active .cnt{color:#e6a9c6}
+  :root:not([data-theme=light]) .pill.proj{background:color-mix(in srgb,var(--pc,#8c98c8) 24%,#1b1b1f);color:color-mix(in srgb,var(--pc,#8c98c8) 55%,#ffffff)}
+  :root:not([data-theme=light]) .btn.pink,:root:not([data-theme=light]) .qai{background:#4a2f3d;color:#f1bcd4}
+}
+:root[data-theme=dark]{
+  --pink:#c98aa9;--blue:#8c98c8;--yellow:#c4ab5a;--green:#86ad98;
+  --tp-bg:#3a2833;--tp-fg:#efb4cf; --tb-bg:#262b40;--tb-fg:#b9c4f0;
+  --ty-bg:#3a3320;--ty-fg:#e9d284; --tg-bg:#233329;--tg-fg:#a9d6bb;
+  --btn:#d8d3c6;--fg:#e7e3d9;--pink-d:#d6709f;--yellow-d:#c9a32a;--blue-d:#8196e6;
+}
+:root[data-theme=dark] .nav-item.active,:root[data-theme=dark] .nav-item.active .cnt{color:#e6a9c6}
+:root[data-theme=dark] .pill.proj{background:color-mix(in srgb,var(--pc,#8c98c8) 24%,#1b1b1f);color:color-mix(in srgb,var(--pc,#8c98c8) 55%,#ffffff)}
+:root[data-theme=dark] .btn.pink,:root[data-theme=dark] .qai{background:#4a2f3d;color:#f1bcd4}
