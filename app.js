@@ -91,12 +91,12 @@ function dashHtml(){
   const total=s.doneToday+s.todayOpen;
   const frac=total?s.doneToday/total:0;
   const R=54,C=2*Math.PI*R;
-  const arc=frac>0?`<circle cx="70" cy="70" r="${R}" fill="none" style="stroke:var(--pink)" stroke-width="18" stroke-linecap="round"
+  const arc=frac>0?`<circle cx="70" cy="70" r="${R}" fill="none" style="stroke:var(--ring-a)" stroke-width="18" stroke-linecap="round"
       stroke-dasharray="${(C*frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 70 70)"/>`:'';
   return `<div class="dash">
     <div class="ring">
       <svg viewBox="0 0 140 140" aria-hidden="true">
-        <circle cx="70" cy="70" r="${R}" fill="none" style="stroke:var(--yellow)" stroke-width="18"/>
+        <circle cx="70" cy="70" r="${R}" fill="none" style="stroke:var(--ring-b)" stroke-width="18"/>
         ${arc}
       </svg>
       <div class="mid"><div class="num">${s.todayOpen}</div><div class="lbl">осталось</div></div>

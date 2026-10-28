@@ -315,9 +315,9 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
 
 /* ===== Мягкие цвета: плашки зависят от темы ===== */
 :root{
-  --tp-bg:var(--pink);--tp-fg:#141414; --tb-bg:var(--blue);--tb-fg:#141414;
-  --ty-bg:var(--yellow);--ty-fg:#141414; --tg-bg:var(--green);--tg-fg:#141414;
-  --ring-hole:var(--card);
+  --tp-bg:#f6ccdb;--tp-fg:#141414; --tb-bg:#cfd5ef;--tb-fg:#141414;
+  --ty-bg:#f4e5a8;--ty-fg:#141414; --tg-bg:#c7e5d5;--tg-fg:#141414;
+  --ring-a:#f2b3cd;--ring-b:#f3e2a0;
 }
 .stat.pink{background:var(--tp-bg);color:var(--tp-fg)}
 .stat.blue{background:var(--tb-bg);color:var(--tb-fg)}
@@ -331,6 +331,7 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
     --pink:#c98aa9;--blue:#8c98c8;--yellow:#c4ab5a;--green:#86ad98;
     --tp-bg:#3a2833;--tp-fg:#efb4cf; --tb-bg:#262b40;--tb-fg:#b9c4f0;
     --ty-bg:#3a3320;--ty-fg:#e9d284; --tg-bg:#233329;--tg-fg:#a9d6bb;
+    --ring-a:var(--pink);--ring-b:var(--yellow);
     --btn:#d8d3c6;--fg:#e7e3d9;--pink-d:#d6709f;--yellow-d:#c9a32a;--blue-d:#8196e6;
   }
   :root:not([data-theme=light]) .nav-item.active,:root:not([data-theme=light]) .nav-item.active .cnt{color:#e6a9c6}
@@ -341,6 +342,7 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
   --pink:#c98aa9;--blue:#8c98c8;--yellow:#c4ab5a;--green:#86ad98;
   --tp-bg:#3a2833;--tp-fg:#efb4cf; --tb-bg:#262b40;--tb-fg:#b9c4f0;
   --ty-bg:#3a3320;--ty-fg:#e9d284; --tg-bg:#233329;--tg-fg:#a9d6bb;
+  --ring-a:var(--pink);--ring-b:var(--yellow);
   --btn:#d8d3c6;--fg:#e7e3d9;--pink-d:#d6709f;--yellow-d:#c9a32a;--blue-d:#8196e6;
 }
 :root[data-theme=dark] .nav-item.active,:root[data-theme=dark] .nav-item.active .cnt{color:#e6a9c6}
