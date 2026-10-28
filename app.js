@@ -13,6 +13,7 @@ let settings=loadSettings();
 let view={type:'today'}; // today | calendar | inbox | upcoming | all | done | habits | stats | settings | project
 let editingId=null, lastPop=null;
 let boardProj='';
+let boardOpen={todo:true,doing:true,done:false};
 let calMode='week',calAnchor=todayStr(),calSel=todayStr();
 
 function load(){
@@ -167,7 +168,7 @@ function render(){
   document.title=title+' · Задачи';
 
   if(view.type==='board'){
-    $('sub').textContent='Перетаскивайте карточки или двигайте стрелками';
+    $('sub').textContent=window.innerWidth>760?'Перетаскивайте карточки или двигайте стрелками':'Двигайте карточки стрелками';
     $('list').innerHTML=boardHtml();bindBoard();return;
   }
   if(view.type==='calendar'){
@@ -386,10 +387,10 @@ function boardHtml(){
       return `<div class="kcard p${t.prio}${t.done?' kdone':''}" draggable="true" data-kid="${t.id}">
         <div class="t-title${t.done?' done-t':''}" data-edit="${t.id}">${esc(t.title)}</div>
         <div class="meta">${t.date?`<span class="pill ${late?'late':'date'}">${fmtDate(t)}</span>`:''}${proj?`<span class="pill proj" style="--pc:${projColor(proj)}">${esc(proj.name)}</span>`:''}${(t.subs||[]).length?`<span class="pill">${t.subs.filter(s=>s.done).length}/${t.subs.length}</span>`:''}</div>
-        <div class="kmove">${ci>0?`<button data-kmove="${t.id}|${COLS[ci-1][0]}" aria-label="В колонку ${COLS[ci-1][1]}">‹</button>`:'<span></span>'}${ci<2?`<button data-kmove="${t.id}|${COLS[ci+1][0]}" aria-label="В колонку ${COLS[ci+1][1]}">›</button>`:'<span></span>'}</div>
+        <div class="kmove">${ci>0?`<button data-kmove="${t.id}|${COLS[ci-1][0]}" aria-label="В колонку ${COLS[ci-1][1]}"><b class="ar-l">‹</b><b class="ar-u">↑</b></button>`:'<span></span>'}${ci<2?`<button data-kmove="${t.id}|${COLS[ci+1][0]}" aria-label="В колонку ${COLS[ci+1][1]}"><b class="ar-l">›</b><b class="ar-u">↓</b></button>`:'<span></span>'}</div>
       </div>`;
     }).join('');
-    return `<section class="kcol" data-col="${k}"><h3>${name}<span>${items.length}</span></h3><div class="kbody">${cards||'<div class="kempty">Пусто</div>'}</div></section>`;
+    return `<section class="kcol${boardOpen[k]?'':' closed'}" data-col="${k}"><h3 data-ktoggle="${k}">${name}<span>${items.length}<i class="chev"></i></span></h3><div class="kbody">${cards||'<div class="kempty">Пусто</div>'}</div></section>`;
   }).join('');
   return filter+`<div class="board">${cols}</div>`;
 }
@@ -403,6 +404,7 @@ function moveTask(id,col){
 function bindBoard(){
   const L=$('list');
   L.querySelectorAll('[data-bp]').forEach(b=>b.onclick=()=>{boardProj=b.dataset.bp;render()});
+  L.querySelectorAll('[data-ktoggle]').forEach(h=>h.onclick=()=>{if(window.innerWidth>760)return;const k=h.dataset.ktoggle;boardOpen[k]=!boardOpen[k];render()});
   L.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openDialog(b.dataset.edit));
   L.querySelectorAll('[data-kmove]').forEach(b=>b.onclick=()=>{const [id,c]=b.dataset.kmove.split('|');moveTask(id,c)});
   L.querySelectorAll('.kcard').forEach(c=>{

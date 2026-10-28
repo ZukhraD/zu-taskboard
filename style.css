@@ -286,20 +286,29 @@ dialog h2{margin:0 0 14px;font-size:22px;font-weight:800;letter-spacing:-.02em}
 .kmove{display:flex;justify-content:space-between;margin-top:6px}
 .kmove button{width:44px;height:36px;border:0;border-radius:10px;background:var(--beige);color:var(--fg);font-size:20px;cursor:pointer}
 .kempty{color:var(--muted,#6b6659);font-size:13px;padding:14px;text-align:center}
+.chev{display:none}.ar-u{display:none}
 @media (max-width:760px){
-  .board{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin:0 -16px;padding:0 16px 8px}
-  .kcol{flex:0 0 84%;scroll-snap-align:center}
+  .board{display:flex;flex-direction:column;gap:10px;margin:0;padding:0}
+  .kcol{flex:none;min-height:0;padding:8px 10px 10px}
+  .kcol h3{cursor:pointer;margin:0;padding:10px 6px 10px 8px;font-size:15px;align-items:center}
+  .kcol h3 span{display:flex;align-items:center;gap:10px}
+  .chev{display:inline-block;width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin-top:-3px;transition:transform .15s}
+  .kcol.closed .chev{transform:rotate(-45deg);margin-top:0}
+  .kcol.closed .kbody{display:none}
+  .kcol:not(.closed) h3{margin-bottom:4px}
+  .ar-l{display:none}.ar-u{display:inline}
 }
 
 /* ---- аккуратность на телефоне ---- */
 @media (max-width:760px){
+  .board{align-items:stretch}
   .toast{bottom:calc(146px + var(--safe-b));width:calc(100% - 28px);max-width:420px;justify-content:space-between;white-space:normal}
-  .board{margin:0 -14px;padding:0 14px 8px;scroll-padding:0 14px}
-  .kcol{flex-basis:86%}
   .sub-add{margin:8px 0 0 38px}
   .sub-add input{background:transparent;padding:8px 0;height:40px;border-radius:0;border-top:1px solid var(--line)}
   dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:26px 26px 0 0;padding:20px 18px calc(20px + var(--safe-b));max-height:92dvh}
   dialog.sdlg{margin:0;height:100dvh;max-height:none;border-radius:0;padding-top:calc(16px + var(--safe-t))}
   .f-row{gap:10px}
   header{padding-top:calc(10px + var(--safe-t))}
+  .kcol h3 span{margin-left:auto}
+  .kcol h3{gap:8px}
 }
