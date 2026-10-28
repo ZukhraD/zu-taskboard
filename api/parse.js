@@ -26,16 +26,20 @@ module.exports = async (req, res) => {
 {"title": строка, "date": "YYYY-MM-DD" или "", "time": "HH:MM" или "", "prio": 1|2|3 (1 высокий, по умолчанию 3), "project": название из списка [${projects.join(', ')}] или ""}.
 Не выдумывай то, чего нет в тексте. Сообщение:\n"""${text}"""`;
 
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const models = [process.env.GEMINI_MODEL, 'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'].filter(Boolean);
   try {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    let r;
+    for (const model of models) {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
       })
-    });
+      });
+      if (r.status !== 404) break; // модель недоступна — пробуем следующую
+    }
     if (!r.ok) return res.status(502).json({ error: 'gemini_' + r.status });
     const j = await r.json();
     const raw = j.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
